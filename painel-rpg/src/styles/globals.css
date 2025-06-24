@@ -1,0 +1,86 @@
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background: #18181b;
+  color: #f4f4f5;
+}
+
+:root {
+  --primary-bg: #18181b;
+  --secondary-bg: #23232b;
+  --accent: #ffd700;
+  --text: #f4f4f5;
+  --card: #23232b;
+  --card-border: #333;
+}
+
+[data-theme="light"] {
+  --primary-bg: #f4f4f5;
+  --secondary-bg: #fff;
+  --accent: #23232b;
+  --text: #23232b;
+  --card: #fff;
+  --card-border: #ddd;
+}
+
+[data-theme="medieval"] {
+  --primary-bg: #2d1e13;
+  --secondary-bg: #3b2716;
+  --accent: #bfa76a;
+  --text: #f5e6c8;
+  --card: #3b2716;
+  --card-border: #bfa76a;
+}
+
+[data-theme="cyberpunk"] {
+  --primary-bg: #0f0026;
+  --secondary-bg: #1a0033;
+  --accent: #ff00cc;
+  --text: #00fff7;
+  --card: #1a0033;
+  --card-border: #ff00cc;
+  font-family: 'Orbitron', 'Inter', sans-serif;
+}
+
+[data-theme="forest"] {
+  --primary-bg: #1b2e1b;
+  --secondary-bg: #284d28;
+  --accent: #7ed957;
+  --text: #eaffea;
+  --card: #284d28;
+  --card-border: #7ed957;
+}
+
+.dashboard {
+  max-width: 900px;
+  margin: 2rem auto;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 32px #000a;
+  animation: fadeIn 0.7s;
+  border: 1px solid var(--card-border);
+}
+.avatar {
+  width: 80px;
+  border-radius: 50%;
+  border: 3px solid #444;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(30px);}
+  to { opacity: 1; transform: translateY(0);}
+}
+
+.navbar {
+  background: var(--secondary-bg);
+  color: var(--text);
+}
+
+button.theme-toggle {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 1.2rem;
+  cursor: pointer;
+  margin-left: 1rem;
+}

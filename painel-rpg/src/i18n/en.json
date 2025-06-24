@@ -1,0 +1,12 @@
+{
+  "dashboard": "Dashboard",
+  "characters": "Characters",
+  "inventory": "Inventory",
+  "adventures": "Adventures",
+  "campaigns": "Campaigns",
+  "quests": "Quests",
+  "economy": "Economy",
+  "reports": "Reports",
+  "admin": "Admin",
+  "logout": "Logout"
+}
