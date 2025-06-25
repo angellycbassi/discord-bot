@@ -22,7 +22,7 @@ def roll_dice(dice_str: str) -> Tuple[int, list, str]:
         (11, [4, 4], "2d6+3 = [4, 4] + 3 = 11")
     """
     pattern = r"(\d+)d(\d+)([+-]\d+)?"
-    match = re.match(pattern, dice_str.lower())
+    match = re.fullmatch(pattern, dice_str.lower())
     
     if not match:
         raise ValueError("Invalid dice format. Use XdY+Z format (e.g., 2d6+3)")
