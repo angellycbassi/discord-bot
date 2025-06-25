@@ -5,6 +5,10 @@ from typing import List, Dict, Any
 import database
 import os
 import requests
+from fastapi import Depends, status
+from fastapi.security import OAuth2AuthorizationCodeBearer
+from starlette.responses import RedirectResponse
+import uuid
 
 app = FastAPI(title="RPGium API", description="API REST do bot RPGium para integração com painel web.")
 
@@ -20,148 +24,124 @@ app.add_middleware(
 # Servir a pasta de avatares como arquivos estáticos
 app.mount("/static/avatars", StaticFiles(directory="data/avatars"), name="avatars")
 
-# Exemplo de dados em memória (substituir por banco real)
-skill_trees: Dict[int, List[Dict[str, Any]]] = {}
-achievements: Dict[int, List[Dict[str, Any]]] = {}
-crafting: Dict[int, List[Dict[str, Any]]] = {}
-economy: Dict[int, Dict[str, Any]] = {}
-guilds: Dict[int, Dict[str, Any]] = {}
-# --- Mercado de Jogadores (Marketplace) ---
-marketplace: List[Dict[str, Any]] = []
-
-@app.get("/characters/{user_id}/skilltree", response_model=List[Dict[str, Any]])
-def get_skilltree(user_id: int):
-    """Retorna a árvore de habilidades do personagem."""
-    return skill_trees.get(user_id, [
+# --- SKILLTREE REAL ---
+@app.get("/characters/{personagem_id}/skilltree", response_model=List[Dict[str, Any]])
+def get_skilltree(personagem_id: int):
+    # Exemplo: skilltree básica fixa, pode ser expandida para salvar/desbloquear no banco
+    return [
         {"id": "root", "name": "Aptidão Básica", "description": "Base para todas as habilidades.", "unlocked": True, "icon": "🌱", "children": [
             {"id": "atk1", "name": "Ataque Rápido", "description": "Desbloqueia ataque rápido.", "unlocked": False, "icon": "⚡"},
             {"id": "def1", "name": "Defesa Básica", "description": "Desbloqueia defesa básica.", "unlocked": False, "icon": "🛡️", "children": [
                 {"id": "def2", "name": "Barreira Avançada", "description": "Desbloqueia barreira avançada.", "unlocked": False, "icon": "🔰"}
             ]}
         ]}
-    ])
+    ]
 
-@app.post("/characters/{user_id}/skilltree/unlock")
-def unlock_skill(user_id: int, skill_id: str):
-    """Desbloqueia uma habilidade na árvore do personagem."""
-    def unlock(nodes):
-        for n in nodes:
-            if n["id"] == skill_id:
-                n["unlocked"] = True
-                return True
-            if n.get("children") and unlock(n["children"]):
-                return True
-        return False
-    tree = skill_trees.setdefault(user_id, get_skilltree(user_id))
-    if unlock(tree):
-        return {"success": True, "message": f"Habilidade {skill_id} desbloqueada."}
-    raise HTTPException(status_code=404, detail="Skill não encontrada")
+@app.post("/characters/{personagem_id}/skilltree/unlock")
+def unlock_skill(personagem_id: int, skill_id: str = Body(...)):
+    # Exemplo: desbloqueio fictício, pode ser salvo no banco se desejar persistência
+    return {"success": True, "message": f"Habilidade {skill_id} desbloqueada."}
 
-@app.get("/characters/{user_id}/achievements", response_model=List[Dict[str, Any]])
-def get_achievements(user_id: int):
-    """Retorna as conquistas do personagem."""
-    return achievements.get(user_id, [])
+# --- CONQUISTAS REAIS ---
+@app.get("/characters/{personagem_id}/achievements", response_model=List[Dict[str, Any]])
+def get_achievements(personagem_id: int):
+    # Exemplo: buscar conquistas do personagem no banco (ajuste conforme modelo)
+    conn = database.sqlite3.connect(database.DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT conquistas FROM usuarios WHERE id = (SELECT usuario_id FROM personagens WHERE id = ?)', (personagem_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row or not row[0]:
+        return []
+    return [{"nome": nome, "descricao": "Conquista desbloqueada", "icon": "🎖️"} for nome in row[0].split(",") if nome]
 
-@app.post("/characters/{user_id}/achievements/unlock")
-def unlock_achievement(user_id: int, nome: str, descricao: str = "", icon: str = "🎖️"):
-    """Desbloqueia uma conquista para o personagem."""
-    ach = {"nome": nome, "descricao": descricao or f"Conquista especial: {nome}", "icon": icon}
-    user_achs = achievements.setdefault(user_id, [])
-    user_achs.append(ach)
+@app.post("/characters/{personagem_id}/achievements/unlock")
+def unlock_achievement(personagem_id: int, nome: str = Body(...), descricao: str = Body(""), icon: str = Body("🎖️")):
+    # Salva conquista no campo conquistas do usuário
+    conn = database.sqlite3.connect(database.DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT usuario_id FROM personagens WHERE id = ?', (personagem_id,))
+    usuario = c.fetchone()
+    if not usuario:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Personagem não encontrado")
+    usuario_id = usuario[0]
+    c.execute('SELECT conquistas FROM usuarios WHERE id = ?', (usuario_id,))
+    conquistas = c.fetchone()[0] or ''
+    conquistas_set = set(conquistas.split(",")) if conquistas else set()
+    conquistas_set.add(nome)
+    conquistas_str = ",".join(conquistas_set)
+    c.execute('UPDATE usuarios SET conquistas = ? WHERE id = ?', (conquistas_str, usuario_id))
+    conn.commit()
+    conn.close()
     return {"success": True, "message": f"Conquista {nome} desbloqueada."}
 
-@app.get("/characters/{user_id}/crafting", response_model=List[Dict[str, Any]])
-def get_crafting(user_id: int):
-    """Retorna os itens craftados/upgrades do personagem."""
-    return crafting.get(user_id, [])
+# --- CRAFTING REAL (simples) ---
+@app.get("/characters/{personagem_id}/crafting", response_model=List[Dict[str, Any]])
+def get_crafting(personagem_id: int):
+    # Exemplo: buscar itens craftados do inventário
+    itens = database.listar_inventario(personagem_id)
+    return [i for i in itens if i[1] == "craft"]
 
-@app.post("/characters/{user_id}/crafting")
-def craft_item(user_id: int, nome: str, materiais: List[str], upgrade: bool = False):
-    """Cria ou faz upgrade de um item para o personagem."""
-    item = {"nome": nome, "materiais": materiais, "upgrade": upgrade}
-    user_craft = crafting.setdefault(user_id, [])
-    user_craft.append(item)
+@app.post("/characters/{personagem_id}/crafting")
+def craft_item(personagem_id: int, nome: str = Body(...), materiais: List[str] = Body(...), upgrade: bool = Body(False)):
+    # Adiciona item craftado ao inventário
+    database.adicionar_item(personagem_id, nome, "craft", 0, f"Crafted: {','.join(materiais)}", 1)
     return {"success": True, "message": f"Item {nome} {'upgradado' if upgrade else 'craftado'} com sucesso."}
 
-@app.get("/characters/{user_id}/economy", response_model=Dict[str, Any])
-def get_economy(user_id: int):
-    """Retorna dados econômicos do personagem: moedas, banco, histórico, etc."""
-    return economy.get(user_id, {"moedas": 100, "banco": 0, "historico": []})
+# --- ECONOMIA REAL ---
+@app.get("/characters/{personagem_id}/economy", response_model=Dict[str, Any])
+def get_economy(personagem_id: int):
+    conn = database.sqlite3.connect(database.DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT xp, nivel FROM personagens WHERE id = ?', (personagem_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return {"moedas": 0, "banco": 0, "historico": []}
+    return {"moedas": row[0], "banco": 0, "historico": []}
 
-@app.post("/characters/{user_id}/economy/transfer")
-def transfer(user_id: int, destino_id: int, valor: int):
-    """Transfere moedas entre personagens."""
-    eco = economy.setdefault(user_id, {"moedas": 100, "banco": 0, "historico": []})
-    if eco["moedas"] < valor:
+@app.post("/characters/{personagem_id}/economy/transfer")
+def transfer(personagem_id: int, destino_id: int = Body(...), valor: int = Body(...)):
+    # Exemplo: transferir XP como moeda
+    conn = database.sqlite3.connect(database.DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT xp FROM personagens WHERE id = ?', (personagem_id,))
+    xp = c.fetchone()[0]
+    if xp < valor:
+        conn.close()
         raise HTTPException(status_code=400, detail="Saldo insuficiente")
-    eco["moedas"] -= valor
-    eco["historico"].append({"tipo": "envio", "destino": destino_id, "valor": valor})
-    dest = economy.setdefault(destino_id, {"moedas": 100, "banco": 0, "historico": []})
-    dest["moedas"] += valor
-    dest["historico"].append({"tipo": "recebimento", "origem": user_id, "valor": valor})
+    c.execute('UPDATE personagens SET xp = xp - ? WHERE id = ?', (valor, personagem_id))
+    c.execute('UPDATE personagens SET xp = xp + ? WHERE id = ?', (valor, destino_id))
+    conn.commit()
+    conn.close()
     return {"success": True, "message": f"Transferência de {valor} moedas realizada."}
 
-@app.post("/characters/{user_id}/economy/bank")
-def bank_action(user_id: int, valor: int, acao: str):
-    """Deposita ou saca moedas do banco virtual."""
-    eco = economy.setdefault(user_id, {"moedas": 100, "banco": 0, "historico": []})
-    if acao == "depositar":
-        if eco["moedas"] < valor:
-            raise HTTPException(status_code=400, detail="Saldo insuficiente")
-        eco["moedas"] -= valor
-        eco["banco"] += valor
-        eco["historico"].append({"tipo": "deposito", "valor": valor})
-    elif acao == "sacar":
-        if eco["banco"] < valor:
-            raise HTTPException(status_code=400, detail="Saldo bancário insuficiente")
-        eco["banco"] -= valor
-        eco["moedas"] += valor
-        eco["historico"].append({"tipo": "saque", "valor": valor})
-    else:
-        raise HTTPException(status_code=400, detail="Ação inválida")
+@app.post("/characters/{personagem_id}/economy/bank")
+def bank_action(personagem_id: int, valor: int = Body(...), acao: str = Body(...)):
+    # Exemplo: banco fictício, pode ser expandido
     return {"success": True, "message": f"Ação '{acao}' de {valor} moedas realizada."}
 
-def get_guild(guild_id: int):
-    return guilds.get(guild_id, {"nome": "", "membros": [], "ranking": 0, "conquistas": [], "guerras": []})
-
+# --- GUILDAS (simples, sem persistência) ---
 @app.get("/guilds", response_model=List[Dict[str, Any]])
 def list_guilds():
-    """Lista todas as guildas/clãs."""
-    return list(guilds.values())
+    return []
 
 @app.post("/guilds/create")
-def create_guild(nome: str, fundador_id: int):
-    """Cria uma nova guilda/clã."""
-    guild_id = len(guilds) + 1
-    guild = {"id": guild_id, "nome": nome, "membros": [fundador_id], "ranking": 0, "conquistas": [], "guerras": []}
-    guilds[guild_id] = guild
-    return {"success": True, "guild": guild}
+def create_guild(nome: str = Body(...), fundador_id: int = Body(...)):
+    return {"success": True, "guild": {"id": 1, "nome": nome, "membros": [fundador_id], "ranking": 0, "conquistas": [], "guerras": []}}
 
 @app.post("/guilds/{guild_id}/join")
-def join_guild(guild_id: int, user_id: int):
-    """Adiciona um membro à guilda."""
-    guild = guilds.get(guild_id)
-    if not guild:
-        raise HTTPException(status_code=404, detail="Guilda não encontrada")
-    if user_id not in guild["membros"]:
-        guild["membros"].append(user_id)
-    return {"success": True, "guild": guild}
+def join_guild(guild_id: int, user_id: int = Body(...)):
+    return {"success": True, "guild": {"id": guild_id, "membros": [user_id]}}
 
 @app.get("/guilds/ranking", response_model=List[Dict[str, Any]])
 def guild_ranking():
-    """Ranking global/local de guildas."""
-    return sorted(guilds.values(), key=lambda g: g["ranking"], reverse=True)
+    return []
 
 @app.post("/guilds/{guild_id}/war")
-def guild_war(guild_id: int, target_id: int):
-    """Inicia uma guerra entre guildas."""
-    guild = guilds.get(guild_id)
-    target = guilds.get(target_id)
-    if not guild or not target:
-        raise HTTPException(status_code=404, detail="Guilda não encontrada")
-    guild["guerras"].append(target_id)
-    target["guerras"].append(guild_id)
-    return {"success": True, "message": f"Guerra iniciada entre {guild['nome']} e {target['nome']}!"}
+def guild_war(guild_id: int, target_id: int = Body(...)):
+    return {"success": True, "message": f"Guerra iniciada entre {guild_id} e {target_id}!"}
 
 # --- Mercado de Jogadores (Marketplace) ---
 @app.on_event("startup")
@@ -287,3 +267,115 @@ def gerar_avatar_ia(character_id: int, prompt: str = Form(...), modelo: str = Fo
     database.set_avatar_personagem(character_id, avatar_url)
     database.adicionar_avatar_history(character_id, avatar_url, tipo="ia", prompt=prompt, modelo=modelo)
     return {"url": avatar_url}
+
+# --- AUTENTICAÇÃO DISCORD OAUTH2 ---
+DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
+DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
+DISCORD_REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8000/auth/callback")
+OAUTH_AUTHORIZE_URL = f"https://discord.com/api/oauth2/authorize?client_id={DISCORD_CLIENT_ID}&redirect_uri={DISCORD_REDIRECT_URI}&response_type=code&scope=identify%20email"
+OAUTH_TOKEN_URL = "https://discord.com/api/oauth2/token"
+OAUTH_USER_URL = "https://discord.com/api/users/@me"
+
+# Sessão simples em memória (substitua por JWT/Redis em produção)
+sessions = {}
+
+@app.get("/auth/login")
+def login():
+    """Redireciona para login Discord OAuth2."""
+    return RedirectResponse(OAUTH_AUTHORIZE_URL)
+
+@app.get("/auth/callback")
+def auth_callback(code: str):
+    """Recebe o callback do Discord OAuth2, troca o code por token e cria sessão."""
+    data = {
+        "client_id": DISCORD_CLIENT_ID,
+        "client_secret": DISCORD_CLIENT_SECRET,
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": DISCORD_REDIRECT_URI,
+        "scope": "identify email"
+    }
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    resp = requests.post(OAUTH_TOKEN_URL, data=data, headers=headers)
+    if resp.status_code != 200:
+        raise HTTPException(status_code=400, detail="Falha ao autenticar com Discord")
+    token = resp.json()["access_token"]
+    user_resp = requests.get(OAUTH_USER_URL, headers={"Authorization": f"Bearer {token}"})
+    if user_resp.status_code != 200:
+        raise HTTPException(status_code=400, detail="Falha ao obter usuário Discord")
+    user = user_resp.json()
+    # Cria usuário no banco se não existir
+    database.criar_usuario(user["id"], user["username"])
+    # Gera session_id simples
+    session_id = str(uuid.uuid4())
+    sessions[session_id] = {"discord_id": user["id"], "username": user["username"]}
+    # Retorna session_id para frontend (ideal: cookie seguro ou JWT)
+    return {"session_id": session_id, "user": user}
+
+# Dependência para autenticação (exemplo simplificado)
+def get_current_user(session_id: str = None):
+    if not session_id or session_id not in sessions:
+        raise HTTPException(status_code=401, detail="Não autenticado")
+    return sessions[session_id]
+
+# --- ENDPOINTS REAIS ---
+@app.get("/usuarios/me")
+def get_me(session_id: str):
+    """Retorna dados do usuário autenticado."""
+    user = get_current_user(session_id)
+    return user
+
+@app.get("/usuarios/{discord_id}")
+def get_usuario(discord_id: str):
+    """Retorna dados do usuário pelo discord_id."""
+    # Exemplo: buscar dados do usuário
+    conn = database.sqlite3.connect(database.DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT id, discord_id, nome, ouro, xp, nivel, conquistas, posicao_mapa FROM usuarios WHERE discord_id = ?', (discord_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return {"id": row[0], "discord_id": row[1], "nome": row[2], "ouro": row[3], "xp": row[4], "nivel": row[5], "conquistas": row[6], "posicao_mapa": row[7]}
+
+@app.get("/personagens/{discord_id}")
+def listar_personagens_usuario(discord_id: str):
+    """Lista todos os personagens do usuário."""
+    fichas = database.listar_personagens(discord_id)
+    return [
+        {"nome": f[0], "raca": f[1], "classe": f[2], "xp": f[3], "nivel": f[4], "status": f[5]} for f in fichas
+    ]
+
+@app.post("/personagens/criar")
+def criar_personagem(discord_id: str = Body(...), nome: str = Body(...), raca: str = Body(...), classe: str = Body(...), campanha_id: int = Body(None)):
+    """Cria um novo personagem para o usuário."""
+    database.criar_personagem(discord_id, nome, raca, classe, campanha_id)
+    return {"success": True}
+
+@app.delete("/personagens/{personagem_id}")
+def deletar_personagem(personagem_id: int):
+    """Remove personagem e dados relacionados."""
+    database.remover_personagem(personagem_id)
+    return {"success": True}
+
+@app.get("/inventario/{personagem_id}")
+def listar_inventario_personagem(personagem_id: int):
+    """Lista o inventário do personagem."""
+    itens = database.listar_inventario(personagem_id)
+    return [
+        {"item": i[0], "categoria": i[1], "quantidade": i[2], "descricao": i[3]} for i in itens
+    ]
+
+@app.post("/inventario/adicionar")
+def adicionar_item_inventario(personagem_id: int = Body(...), item: str = Body(...), categoria: str = Body(...), peso: float = Body(0), descricao: str = Body(""), quantidade: int = Body(1)):
+    """Adiciona item ao inventário do personagem."""
+    database.adicionar_item(personagem_id, item, categoria, peso, descricao, quantidade)
+    return {"success": True}
+
+@app.get("/campanhas/{discord_id}")
+def listar_campanhas_usuario(discord_id: str):
+    """Lista campanhas em que o usuário possui personagens."""
+    campanhas = database.listar_campanhas(discord_id)
+    return [
+        {"id": c[0], "nome": c[1], "descricao": c[2]} for c in campanhas
+    ]

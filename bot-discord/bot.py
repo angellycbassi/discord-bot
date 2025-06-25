@@ -41,41 +41,23 @@ MAPA_EVENTOS = {
     (9, 9): "🏰 Você avista um castelo lendário ao longe!"
 }
 
-# Grupos globais de slash commands
-personagem_group = app_commands.Group(name="personagem", description="Gerencie fichas de personagem")
-inventario_group = app_commands.Group(name="inventario", description="Gerencie o inventário de fichas")
-combate_group = app_commands.Group(name="combate", description="Gerencie combates e ações de batalha")
-campanha_group = app_commands.Group(name="campanha", description="Gerencie campanhas de RPG")
-missao_group = app_commands.Group(name="missao", description="Gerencie missões e eventos")
-aventura_group = app_commands.Group(name="aventura", description="Comandos de aventura de mundo aberto")
-ia_group = app_commands.Group(name="ia", description="Comandos de integração com IA/NPCs")
-economia_group = app_commands.Group(name="economia", description="Comandos de economia e loja")
-engajamento_group = app_commands.Group(name="engajamento", description="Comandos de engajamento e gamificação")
-idioma_group = app_commands.Group(name="idioma", description="Comandos de idioma e tradução")
-visual_group = app_commands.Group(name="visual", description="Comandos de personalização visual")
-relatorio_group = app_commands.Group(name="relatorio", description="Comandos de relatórios e estatísticas")
-integracao_group = app_commands.Group(name="integracao", description="Comandos de integração externa")
-monetizacao_group = app_commands.Group(name="monetizacao", description="Comandos de monetização e SaaS")
-admin_group = app_commands.Group(name="admin", description="Comandos administrativos do bot")
+# Importa os grupos de comandos dos models
+from models.personagem import personagem_group
+from models.inventario import inventario_group
+from models.campanha import campanha_group
+from models.combate import combate_group
+# Importa os módulos para registrar os comandos (garante execução dos decorators)
+import models.personagem
+import models.inventario
+import models.campanha
+import models.combate
 
-# Lista de cogs padrão e avançados para carregamento automático
+# Lista de cogs básicos para carregamento automático
 COGS = [
-    'cogs.character_advanced',
-    'cogs.inventory_advanced',
-    'cogs.combat_advanced',
+    'cogs.character',
+    'cogs.inventory',
     'cogs.campaign',
-    'cogs.quest_event',
-    'cogs.ai_integration',
-    'cogs.master_panel',
-    'cogs.economy',
-    'cogs.engagement',
-    'cogs.multilang',
-    'cogs.visuals',
-    'cogs.reporting',
-    'cogs.external_integration',
-    'cogs.monetization',
-    'cogs.open_world',
-    # Adicione outros cogs personalizados aqui
+    'cogs.combat',
 ]
 
 @bot.event
@@ -97,22 +79,11 @@ async def on_ready():
             logger.error(f'Failed to load cog {cog}: {str(e)}')
             print(f'Erro ao carregar cog {cog}: {str(e)}')
     
-    # Registrar grupos globais de slash commands
+    # Registrar grupos globais de slash commands (apenas essenciais)
     bot.tree.add_command(personagem_group)
     bot.tree.add_command(inventario_group)
     bot.tree.add_command(combate_group)
     bot.tree.add_command(campanha_group)
-    bot.tree.add_command(missao_group)
-    bot.tree.add_command(aventura_group)
-    bot.tree.add_command(ia_group)
-    bot.tree.add_command(economia_group)
-    bot.tree.add_command(engajamento_group)
-    bot.tree.add_command(idioma_group)
-    bot.tree.add_command(visual_group)
-    bot.tree.add_command(relatorio_group)
-    bot.tree.add_command(integracao_group)
-    bot.tree.add_command(monetizacao_group)
-    bot.tree.add_command(admin_group)
 
     print('Sincronizando comandos globais...')
     try:
@@ -142,59 +113,26 @@ async def on_command_error(ctx, error):
 async def help_command(interaction: discord.Interaction):
     help_text = (
         "[Acessível]\n"
-        "**Painel Interativo:**\n"
-        "Use `/painel` para abrir o painel visual do bot.\n"
-        "\n**Personagem:**\n"
+        "**Personagem:**\n"
         "/personagem criar <nome> [template] — Cria ficha\n"
         "/personagem listar — Lista fichas\n"
         "/personagem editar <ficha_id> <campo> <valor> — Edita ficha\n"
         "/personagem remover <ficha_id> — Remove ficha\n"
-        "/personagem template <ação> <nome> — Gerencia templates\n"
         "\n**Inventário:**\n"
         "/inventario adicionar <ficha_id> <item> <categoria> [peso] [descrição]\n"
         "/inventario remover <ficha_id> <item_id>\n"
         "/inventario listar <ficha_id>\n"
-        "/inventario editar <ficha_id> <item_id> <campo> <valor>\n"
         "\n**Combate:**\n"
         "/combate iniciar <campanha_id> [descrição]\n"
         "/combate atacar <combate_id> <alvo> [macro]\n"
         "/combate defender <combate_id>\n"
         "/combate usar_item <combate_id> <item_id>\n"
-        "/combate log <combate_id>\n"
         "\n**Campanha:**\n"
         "/campanha criar <nome>\n"
         "/campanha convidar <campanha_id> <usuário>\n"
         "/campanha registrar_sessao <campanha_id> [descrição]\n"
         "/campanha xp <campanha_id> <usuário> <quantidade>\n"
-        "\n**Missão/Eventos:**\n"
-        "/missao criar <nome> [recompensa]\n"
-        "/missao progresso <missao_id> <progresso>\n"
-        "/missao sortear <evento_id>\n"
-        "\n**Aventura de Mundo Aberto:**\n"
-        "/aventura iniciar [solo]\n"
-        "/aventura convidar <usuário>\n"
-        "/aventura mapa\n"
-        "/aventura boss\n"
-        "\n**IA/NPCs:**\n"
-        "/ia npc <nome> <mensagem>\n"
-        "/ia sugerir_evento <campanha_id>\n"
-        "\n**Economia/Loja:**\n"
-        "/economia transferir <usuário> <quantidade>\n"
-        "/economia loja\n"
-        "\n**Engajamento/Gamificação:**\n"
-        "/engajamento ranking\n"
-        "/engajamento desafio\n"
-        "\n**Idioma/Tradução:**\n"
-        "/idioma definir <idioma>\n"
-        "\n**Visual/Temas:**\n"
-        "/visual tema <tema>\n"
-        "\n**Relatórios:**\n"
-        "/relatorio exportar [tipo]\n"
-        "\n**Integração Externa:**\n"
-        "/integracao google_sheets\n"
-        "\n**Monetização:**\n"
-        "/monetizacao plano\n"
-        "\n\nDica: Use os botões e comandos sempre que possível. Todas as funções possuem suporte a leitores de tela e tooltips detalhados."
+        "\n\nDica: Use os comandos slash para interagir com o bot. Para mais detalhes, utilize `/help` novamente."
     )
     await interaction.response.send_message(help_text, ephemeral=True)
 
@@ -260,18 +198,6 @@ def gerar_embed_tema(user_id, title, description, fields=None):
     if avatar_url:
         embed.set_thumbnail(url=avatar_url)
     return embed
-
-# Comando para escolher tema visual
-@visual_group.command(name="tema", description="Escolha o tema visual do seu painel e fichas.")
-@app_commands.describe(tema="Escolha entre: dark, medieval, cyberpunk, classic")
-async def escolher_tema(interaction: discord.Interaction, tema: str):
-    tema = tema.lower()
-    if tema not in THEMES:
-        await interaction.response.send_message(f"Temas disponíveis: {', '.join(THEMES.keys())}", ephemeral=True)
-        return
-    set_user_theme(interaction.user.id, tema)
-    embed = gerar_embed_tema(interaction.user.id, "Tema Atualizado", f"Seu tema foi alterado para **{tema}**!")
-    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # Modal para upload de avatar customizado
 class AvatarModal(discord.ui.Modal, title="Avatar do Personagem"):
@@ -417,19 +343,6 @@ class CombateButton(discord.ui.Button):
             return
         await interaction.response.send_modal(IniciarCombateModalAvancado(self.user_id, fichas))
 
-# Melhorar alto contraste: tema acessível já está disponível como 'dark', mas pode ser expandido para 'acessibilidade' se desejar.
-@visual_group.command(name="contraste", description="Ativa/desativa modo de alto contraste para acessibilidade.")
-async def toggle_contraste(interaction: discord.Interaction):
-    atual = get_user_theme(interaction.user.id)
-    if atual != "dark":
-        set_user_theme(interaction.user.id, "dark")
-        msg = "Alto contraste ativado (tema escuro e acessível)."
-    else:
-        set_user_theme(interaction.user.id, "classic")
-        msg = "Alto contraste desativado."
-    embed = gerar_embed_tema(interaction.user.id, "Acessibilidade", msg)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
-
 # Garantir textos claros para leitores de tela nos principais embeds
 def gerar_embed_tema(user_id, title, description, fields=None):
     theme = get_user_theme(user_id)
@@ -472,50 +385,39 @@ async def on_guild_join(guild):
 #    except Exception as e:
 #        await interaction.response.send_message(f"[Acessível] ❌ Erro ao limpar banco: {str(e)}", ephemeral=True)
 
-@admin_group.command(name="sync", description="Força a sincronização dos comandos do bot (apenas para o owner)")
-async def sync_commands(interaction: discord.Interaction):
-    if interaction.user.id != bot.owner_id:
-        await interaction.response.send_message("[Acessível] ❌ Apenas o proprietário do bot pode executar este comando!", ephemeral=True)
-        return
-    try:
-        print("Iniciando limpeza e sincronização forçada...")
-        await bot.tree.clear_commands(guild=None)
-        await bot.tree.sync()
-        print("Comandos limpos, registrando novos comandos...")
-        bot.tree.add_command(personagem_group)
-        bot.tree.add_command(inventario_group)
-        bot.tree.add_command(combate_group)
-        bot.tree.add_command(campanha_group)
-        bot.tree.add_command(missao_group)
-        bot.tree.add_command(aventura_group)
-        bot.tree.add_command(ia_group)
-        bot.tree.add_command(economia_group)
-        bot.tree.add_command(engajamento_group)
-        bot.tree.add_command(idioma_group)
-        bot.tree.add_command(visual_group)
-        bot.tree.add_command(relatorio_group)
-        bot.tree.add_command(integracao_group)
-        bot.tree.add_command(monetizacao_group)
-        bot.tree.add_command(admin_group)
-        await bot.tree.sync()
-        await interaction.response.send_message("[Acessível] ✅ Comandos sincronizados com sucesso! Todos os comandos slash estão atualizados.", ephemeral=True)
-        print("Sincronização forçada concluída!")
-        print('Comandos disponíveis após sync:')
-        for cmd in bot.tree.get_commands():
-            print(f'- /{cmd.name}: {cmd.description}')
-    except Exception as e:
-        await interaction.response.send_message(f"[Acessível] ❌ Erro ao sincronizar: {str(e)}", ephemeral=True)
-        print(f"Erro durante sincronização: {str(e)}")
+# @admin_group.command(name="sync", description="Força a sincronização dos comandos do bot (apenas para o owner)")
+# async def sync_commands(interaction: discord.Interaction):
+#     if interaction.user.id != bot.owner_id:
+#         await interaction.response.send_message("[Acessível] ❌ Apenas o proprietário do bot pode executar este comando!", ephemeral=True)
+#         return
+#     try:
+#         print("Iniciando limpeza e sincronização forçada...")
+#         await bot.tree.clear_commands(guild=None)
+#         await bot.tree.sync()
+#         print("Comandos limpos, registrando novos comandos...")
+#         bot.tree.add_command(personagem_group)
+#         bot.tree.add_command(inventario_group)
+#         bot.tree.add_command(combate_group)
+#         bot.tree.add_command(campanha_group)
+#         await bot.tree.sync()
+#         await interaction.response.send_message("[Acessível] ✅ Comandos sincronizados com sucesso! Todos os comandos slash estão atualizados.", ephemeral=True)
+#         print("Sincronização forçada concluída!")
+#         print('Comandos disponíveis após sync:')
+#         for cmd in bot.tree.get_commands():
+#             print(f'- /{cmd.name}: {cmd.description}')
+#     except Exception as e:
+#         await interaction.response.send_message(f"[Acessível] ❌ Erro ao sincronizar: {str(e)}", ephemeral=True)
+#         print(f"Erro durante sincronização: {str(e)}")
 
 # Exemplo de subcomando para o grupo aventura
-@aventura_group.command(name="iniciar", description="Inicia uma aventura de mundo aberto.")
-async def aventura_iniciar(interaction: discord.Interaction):
-    await interaction.response.send_message("🌄 Uma nova aventura começou! Prepare-se para explorar o desconhecido.", ephemeral=True)
+# @aventura_group.command(name="iniciar", description="Inicia uma aventura de mundo aberto.")
+# async def aventura_iniciar(interaction: discord.Interaction):
+#     await interaction.response.send_message("🌄 Uma nova aventura começou! Prepare-se para explorar o desconhecido.", ephemeral=True)
 
-# Handler para chamada direta ao grupo /aventura
-@aventura_group.command(name="_placeholder", description="Mostra informações sobre o grupo de aventura.")
-async def aventura_placeholder(interaction: discord.Interaction):
-    await interaction.response.send_message("Use um subcomando, como `/aventura iniciar`, para começar sua jornada!", ephemeral=True)
+# # Handler para chamada direta ao grupo /aventura
+# @aventura_group.command(name="_placeholder", description="Mostra informações sobre o grupo de aventura.")
+# async def aventura_placeholder(interaction: discord.Interaction):
+#     await interaction.response.send_message("Use um subcomando, como `/aventura iniciar`, para começar sua jornada!", ephemeral=True)
 
 class CombateButton(discord.ui.Button):
     def __init__(self, user_id):
@@ -862,32 +764,7 @@ PODERES_INIMIGOS = {
 
 from database import set_avatar_personagem, get_avatar_personagem
 
-# Modal para upload de avatar customizado por personagem
-class AvatarPersonagemModal(discord.ui.Modal, title="Avatar do Personagem"):
-    def __init__(self, ficha_id):
-        super().__init__()
-        self.ficha_id = ficha_id
-        self.url = discord.ui.TextInput(label="URL da Imagem do Avatar", placeholder="Cole o link da imagem (jpg/png)", max_length=200)
-        self.add_item(self.url)
-    async def on_submit(self, interaction: discord.Interaction):
-        set_avatar_personagem(self.ficha_id, self.url.value)
-        embed = discord.Embed(
-            title="Avatar Atualizado",
-            description="O avatar da ficha foi salvo! Ele aparecerá nos detalhes da ficha.",
-            color=discord.Color.green()
-        )
-        embed.set_thumbnail(url=self.url.value)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-# Comando para definir avatar de uma ficha
-@personagem_group.command(name="avatar", description="Defina o avatar de uma ficha de personagem.")
-@app_commands.describe(ficha_id="ID da ficha para definir o avatar")
-async def personagem_avatar(interaction: discord.Interaction, ficha_id: int):
-    fichas = listar_personagens(str(interaction.user.id))
-    if not fichas or ficha_id < 1 or ficha_id > len(fichas):
-        await interaction.response.send_message("Ficha não encontrada.", ephemeral=True)
-        return
-    await interaction.response.send_modal(AvatarPersonagemModal(ficha_id))
+# Removendo duplicidade: comando avatar e modal já estão em models/personagem.py
 
 # Utilitário para gerar embed de ficha com avatar customizado
 def gerar_embed_ficha_personagem(user_id, ficha_id, personagem):

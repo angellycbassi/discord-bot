@@ -1,0 +1,1 @@
+Atenção: O Next.js App Router (src/app) não deve coexistir com rotas de página em src/pages. Apenas arquivos de API (como src/pages/api/auth.ts) podem permanecer. Todos os outros arquivos .tsx em src/pages devem ser removidos para evitar conflitos.

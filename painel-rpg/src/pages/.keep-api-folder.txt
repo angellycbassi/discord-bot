@@ -1,0 +1,1 @@
+Este arquivo impede que a pasta api/ seja removida acidentalmente. Apenas arquivos de API devem ficar em src/pages/api/.

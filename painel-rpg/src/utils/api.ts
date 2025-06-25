@@ -10,33 +10,39 @@ const api = axios.create({
 
 export default api;
 
-export async function fetchUser() {
-  const { data } = await api.get("/auth/me");
+export async function fetchUser(sessionId?: string) {
+  // Busca usuário autenticado pelo session_id
+  const { data } = await api.get("/usuarios/me", {
+    params: { session_id: sessionId || getSessionId() },
+  });
   return data;
 }
 
-export async function fetchCharacters(userId?: string) {
+export async function fetchCharacters(discordId?: string) {
   // Busca personagens do usuário logado
-  const { data } = await api.get(`/characters?user_id=${userId || ""}`);
+  const { data } = await api.get(`/personagens/${discordId || getUserId()}`);
   return data;
 }
 
 export async function createCharacter(payload: any) {
-  const { data } = await api.post("/characters", payload);
+  const { data } = await api.post("/personagens/criar", payload);
   return data;
 }
 
 export async function updateCharacter(id: string, payload: any) {
-  const { data } = await api.put(`/characters/${id}`, payload);
-  return data;
+  // Não implementado no backend, mas pode ser adicionado
+  // const { data } = await api.put(`/personagens/${id}`, payload);
+  // return data;
+  throw new Error("updateCharacter não implementado no backend");
 }
 
 export async function deleteCharacter(id: string) {
-  const { data } = await api.delete(`/characters/${id}`);
+  const { data } = await api.delete(`/personagens/${id}`);
   return data;
 }
 
 export async function getSkillTree(characterId: string) {
+  // Mantém endpoint existente
   const { data } = await api.get(`/characters/${characterId}/skilltree`);
   return data;
 }
@@ -49,34 +55,26 @@ export async function unlockSkill(characterId: string, skillId: string) {
   return data;
 }
 
-export async function fetchInventory(characterId: number) {
-  const { data } = await api.get(`/characters/${characterId}/inventory`);
+export async function fetchInventory(personagemId: number) {
+  const { data } = await api.get(`/inventario/${personagemId}`);
   return data;
 }
 
-export async function fetchAdventures() {
-  const { data } = await api.get("/adventures");
+export async function fetchCampaigns(discordId?: string) {
+  const { data } = await api.get(`/campanhas/${discordId || getUserId()}`);
   return data;
 }
 
-export async function fetchCampaigns() {
-  const { data } = await api.get("/campaigns");
-  return data;
+// Funções utilitárias para session_id e user_id
+function getSessionId() {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("session_id") || undefined;
+  }
+  return undefined;
 }
-
-export async function fetchQuests() {
-  const { data } = await api.get("/quests");
-  return data;
+function getUserId() {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("discord_id") || undefined;
+  }
+  return undefined;
 }
-
-export async function fetchEconomy() {
-  const { data } = await api.get("/economy");
-  return data;
-}
-
-export async function fetchReports() {
-  const { data } = await api.get("/reports");
-  return data;
-}
-
-// Outras funções: fetchCampaigns, etc. podem ser adicionadas conforme as próximas etapas.

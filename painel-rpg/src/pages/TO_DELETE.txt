@@ -1,0 +1,13 @@
+Os arquivos .tsx abaixo devem ser removidos para evitar conflito com o App Router:
+- admin.tsx
+- adventures.tsx
+- campaigns.tsx
+- characters.tsx
+- economy.tsx
+- inventory.tsx
+- marketplace.tsx
+- quests.tsx
+- reports.tsx
+- _app.tsx
+
+Apenas a pasta api/ deve permanecer em src/pages.
