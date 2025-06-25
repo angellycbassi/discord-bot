@@ -1,76 +1,74 @@
 import { useEffect, useState } from "react";
-import { fetchCharacters } from "../utils/api";
+import {
+  fetchCharacters,
+  createCharacter,
+  updateCharacter,
+  deleteCharacter,
+  getSkillTree,
+  unlockSkill,
+} from "../utils/api";
 import Navbar from "../components/Navbar";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import Loader from "../components/Loader";
 import CharacterForm from "../components/CharacterForm";
 import { motion } from "framer-motion";
 import SkillTree, { SkillNode } from "../components/SkillTree";
-
-// Definição do tipo para personagem
-interface Character {
-  nome: string;
-  raca: string;
-  classe: string;
-  xp: number;
-}
+import { useAuth } from "../context/AuthContext";
+import { useApi } from "../hooks/useApi";
 
 export default function Characters() {
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
-  const [editChar, setEditChar] = useState<Character | null>(null);
-  const [skills, setSkills] = useState<SkillNode[]>([
-    {
-      id: "root",
-      name: "Aptidão Básica",
-      description: "Base para todas as habilidades.",
-      unlocked: true,
-      icon: "🌱",
-      children: [
-        {
-          id: "atk1",
-          name: "Ataque Rápido",
-          description: "Desbloqueia ataque rápido.",
-          unlocked: false,
-          icon: "⚡",
-        },
-        {
-          id: "def1",
-          name: "Defesa Básica",
-          description: "Desbloqueia defesa básica.",
-          unlocked: false,
-          icon: "🛡️",
-          children: [
-            {
-              id: "def2",
-              name: "Barreira Avançada",
-              description: "Desbloqueia barreira avançada.",
-              unlocked: false,
-              icon: "🔰",
-            },
-          ],
-        },
-      ],
-    },
-  ]);
+  const [editChar, setEditChar] = useState<any | null>(null);
+  const [skills, setSkills] = useState<SkillNode[]>([]);
+  const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
 
+  // Busca personagens do usuário logado
+  const {
+    data: characters = [],
+    loading,
+    error,
+    refetch,
+  } = useApi(() => fetchCharacters(user?.id), [user?.id]);
+
+  // Busca skilltree do personagem selecionado
   useEffect(() => {
-    fetchCharacters().then(setCharacters).finally(() => setLoading(false));
-  }, []);
-
-  function handleUnlockSkill(id: string) {
-    function unlock(nodes: SkillNode[]): SkillNode[] {
-      return nodes.map((n) =>
-        n.id === id
-          ? { ...n, unlocked: true }
-          : { ...n, children: n.children ? unlock(n.children) : undefined }
-      );
+    if (selectedCharId) {
+      getSkillTree(selectedCharId)
+        .then(setSkills)
+        .catch(() => setSkills([]));
     }
-    setSkills((prev) => unlock(prev));
+  }, [selectedCharId]);
+
+  // Criação/edição de personagem
+  async function handleSubmit(data: any) {
+    if (editChar) {
+      await updateCharacter(editChar.id, data);
+    } else {
+      await createCharacter({ ...data, userId: user?.id });
+    }
+    setShowForm(false);
+    setEditChar(null);
+    refetch();
+  }
+
+  // Exclusão real
+  async function handleDelete(id: string) {
+    await deleteCharacter(id);
+    refetch();
+  }
+
+  // Desbloqueio real de skill
+  async function handleUnlockSkill(skillId: string) {
+    if (!selectedCharId) return;
+    await unlockSkill(selectedCharId, skillId);
+    const updated = await getSkillTree(selectedCharId);
+    setSkills(updated);
   }
 
   if (loading) return <Loader text="Carregando personagens..." />;
+  if (error) return <div>Erro ao carregar personagens.</div>;
+
   return (
     <ProtectedRoute>
       <Navbar />
@@ -98,30 +96,13 @@ export default function Characters() {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
           >
-            <CharacterForm
-              onSubmit={(data) => {
-                // Exemplo: adicionar personagem localmente
-                if (editChar) {
-                  setCharacters((chars) =>
-                    chars.map((c) => (c === editChar ? data : c))
-                  );
-                } else {
-                  setCharacters((chars) => [...chars, data]);
-                }
-                setShowForm(false);
-              }}
-              initial={editChar}
-            />
+            <CharacterForm onSubmit={handleSubmit} initial={editChar} />
           </motion.div>
         )}
-        <section style={{ margin: "32px 0" }}>
-          <h2>Árvore de Habilidades</h2>
-          <SkillTree tree={skills} onUnlock={handleUnlockSkill} />
-        </section>
         <ul>
-          {characters.map((c, i) => (
+          {characters.map((c: any, i: number) => (
             <motion.li
-              key={i}
+              key={c.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               layout
@@ -151,9 +132,7 @@ export default function Characters() {
                 Editar
               </button>
               <button
-                onClick={() =>
-                  setCharacters((chars) => chars.filter((x) => x !== c))
-                }
+                onClick={() => handleDelete(c.id)}
                 style={{
                   marginLeft: 8,
                   background: "#c00",
@@ -165,9 +144,28 @@ export default function Characters() {
               >
                 Excluir
               </button>
+              <button
+                onClick={() => setSelectedCharId(c.id)}
+                style={{
+                  marginLeft: 8,
+                  background: "#0af",
+                  color: "#fff",
+                  border: 0,
+                  borderRadius: 6,
+                  padding: "2px 8px",
+                }}
+              >
+                Ver Skills
+              </button>
             </motion.li>
           ))}
         </ul>
+        {selectedCharId && (
+          <section style={{ margin: "32px 0" }}>
+            <h2>Árvore de Habilidades</h2>
+            <SkillTree tree={skills} onUnlock={handleUnlockSkill} />
+          </section>
+        )}
       </main>
     </ProtectedRoute>
   );
